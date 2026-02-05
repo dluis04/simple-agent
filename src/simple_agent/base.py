@@ -24,14 +24,23 @@ class BaseAgent(ABC):
     - Interactive run loop
     """
 
-    def __init__(self, model: str = "claude-sonnet-4-20250514"):
-        """Initialize the agent with Anthropic client."""
+    def __init__(self, model: str = "claude-sonnet-4-20250514", max_history_length: int = 50):
+        """
+        Initialize the agent with Anthropic client.
+
+        Args:
+            model: The Claude model to use
+            max_history_length: Maximum number of messages to keep in history.
+                               Uses a sliding window to prevent unbounded growth.
+                               Set to 0 for unlimited history (not recommended).
+        """
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
             raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
 
         self.client = Anthropic(api_key=api_key)
         self.model = model
+        self.max_history_length = max_history_length
         self.conversation_history: list[dict] = []
         self.tool_registry = ToolRegistry()
 
@@ -39,6 +48,33 @@ class BaseAgent(ABC):
     def memory(self) -> list[str]:
         """Access to tool registry memory."""
         return self.tool_registry.memory
+
+    def clear_history(self) -> None:
+        """Clear conversation history for manual control."""
+        self.conversation_history.clear()
+
+    def _trim_history(self) -> None:
+        """
+        Trim conversation history to max_history_length using a sliding window.
+
+        Keeps the most recent messages while preserving conversation coherence.
+        Always starts with a user message to maintain valid message structure.
+        """
+        if self.max_history_length <= 0:
+            return  # Unlimited history
+
+        if len(self.conversation_history) <= self.max_history_length:
+            return  # No trimming needed
+
+        # Calculate how many messages to remove
+        excess = len(self.conversation_history) - self.max_history_length
+
+        # Trim from the beginning, but ensure we start with a user message
+        self.conversation_history = self.conversation_history[excess:]
+
+        # Ensure history starts with a user message for valid API structure
+        while self.conversation_history and self.conversation_history[0]["role"] != "user":
+            self.conversation_history.pop(0)
 
     @abstractmethod
     def run_step(self, user_input: str) -> tuple[str, list]:

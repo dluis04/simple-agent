@@ -83,6 +83,8 @@ class AdvancedAgent(BaseAgent):
                 self.conversation_history.append(
                     {"role": "assistant", "content": response.content}
                 )
+                # Trim history to prevent unbounded growth
+                self._trim_history()
                 return text_response, tool_results
 
             elif response.stop_reason == "tool_use":
@@ -118,9 +120,12 @@ class AdvancedAgent(BaseAgent):
                 self.conversation_history.append(
                     {"role": "user", "content": tool_results_content}
                 )
+                # Trim history to prevent unbounded growth during tool loops
+                self._trim_history()
                 # Loop continues to process tool results
 
             else:
+                self._trim_history()
                 return f"Unexpected stop reason: {response.stop_reason}", tool_results
 
     def _get_banner(self) -> str:
