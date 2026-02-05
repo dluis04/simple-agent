@@ -4,11 +4,15 @@ Base agent class with shared functionality.
 
 import os
 from abc import ABC, abstractmethod
+from typing import Union
 
 from anthropic import Anthropic
 from dotenv import load_dotenv
 
 from .tools import ToolRegistry
+
+# Type alias for action results - supports both string (SimpleAgent) and dict (AdvancedAgent)
+ActionResult = Union[str, dict]
 
 load_dotenv()
 
@@ -77,7 +81,7 @@ class BaseAgent(ABC):
             self.conversation_history.pop(0)
 
     @abstractmethod
-    def run_step(self, user_input: str) -> tuple[str, list]:
+    def run_step(self, user_input: str) -> tuple[str, list[ActionResult]]:
         """
         Process a single user input through the agent loop.
 
@@ -85,7 +89,8 @@ class BaseAgent(ABC):
             user_input: The user's message
 
         Returns:
-            Tuple of (response_text, action_results)
+            Tuple of (response_text, action_results) where action_results
+            contains str for SimpleAgent or dict for AdvancedAgent
         """
         pass
 
@@ -128,6 +133,6 @@ class BaseAgent(ABC):
         """Get the banner text for interactive mode."""
         return "Conversational Agent"
 
-    def _print_action_result(self, result):
+    def _print_action_result(self, result: ActionResult) -> None:
         """Print a single action result."""
         print(f"   {result}")

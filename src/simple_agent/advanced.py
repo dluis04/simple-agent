@@ -8,7 +8,7 @@ Benefits over manual parsing:
 - Multi-tool orchestration
 """
 
-from .base import BaseAgent
+from .base import ActionResult, BaseAgent
 from .tools import TOOL_SCHEMAS
 
 
@@ -42,7 +42,7 @@ class AdvancedAgent(BaseAgent):
 
         return {"error": f"Unknown tool: {tool_name}"}
 
-    def run_step(self, user_input: str) -> tuple[str, list[dict]]:
+    def run_step(self, user_input: str) -> tuple[str, list[ActionResult]]:
         """
         Advanced agent loop with native tool use.
 
@@ -131,9 +131,12 @@ class AdvancedAgent(BaseAgent):
     def _get_banner(self) -> str:
         return "Advanced Agent (Native Tool Use)"
 
-    def _print_action_result(self, result: dict):
+    def _print_action_result(self, result: ActionResult) -> None:
         """Print a tool result."""
-        print(f"   {result['tool']}: {result['output']}")
+        if isinstance(result, dict):
+            print(f"   {result['tool']}: {result['output']}")
+        else:
+            print(f"   {result}")
 
 
 def compare_approaches():

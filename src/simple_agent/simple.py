@@ -3,7 +3,7 @@ Simple Conversational Agent with manual action parsing.
 Demonstrates the basic agent loop: Observe -> Think -> Act
 """
 
-from .base import BaseAgent
+from .base import ActionResult, BaseAgent
 
 
 class SimpleAgent(BaseAgent):
@@ -120,7 +120,7 @@ use save_note. If they ask about something you saved, use search_memory."""
 
         return response_text
 
-    def act(self, response_text: str) -> tuple[str, list[str]]:
+    def act(self, response_text: str) -> tuple[str, list[ActionResult]]:
         """
         ACT step: Parse and execute actions from LLM response.
 
@@ -146,7 +146,7 @@ use save_note. If they ask about something you saved, use search_memory."""
 
         return display_text, action_results
 
-    def run_step(self, user_input: str) -> tuple[str, list[str]]:
+    def run_step(self, user_input: str) -> tuple[str, list[ActionResult]]:
         """
         The basic agent loop: Observe -> Think -> Act
 
