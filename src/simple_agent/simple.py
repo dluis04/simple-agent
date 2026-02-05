@@ -115,6 +115,9 @@ use save_note. If they ask about something you saved, use search_memory."""
             {"role": "assistant", "content": response_text}
         )
 
+        # Trim history to prevent unbounded growth
+        self._trim_history()
+
         return response_text
 
     def act(self, response_text: str) -> tuple[str, list[str]]:
