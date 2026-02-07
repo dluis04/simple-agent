@@ -3,6 +3,11 @@
 import pytest
 
 from simple_agent.simple import SimpleAgent  # noqa: F401
+from simple_agent.simple import (
+    MAX_ACTIONS_PER_RESPONSE,
+    MAX_PARAMETER_LENGTH,
+    ALLOWED_TOOLS,
+)
 from simple_agent.tools import ToolRegistry
 
 
@@ -18,10 +23,18 @@ class TestParseActions:
                 actions = []
                 for line in response_text.split("\n"):
                     if line.strip().startswith("ACTION:"):
+                        if len(actions) >= MAX_ACTIONS_PER_RESPONSE:
+                            break
                         action_part = line.strip()[7:].strip()
                         if ":" in action_part:
                             tool_name, parameter = action_part.split(":", 1)
-                            actions.append((tool_name.strip(), parameter.strip()))
+                            tool_name = tool_name.strip()
+                            parameter = parameter.strip()
+                            if tool_name not in ALLOWED_TOOLS:
+                                continue
+                            if len(parameter) > MAX_PARAMETER_LENGTH:
+                                parameter = parameter[:MAX_PARAMETER_LENGTH]
+                            actions.append((tool_name, parameter))
                 return actions
 
         return Parser()
@@ -125,3 +138,59 @@ class TestExecuteAction:
         result = executor.execute_action("unknown_tool", "param")
         assert "Error" in result
         assert "Unknown tool" in result
+
+
+class TestParseActionsValidation:
+    """Tests for action parsing validation."""
+
+    @pytest.fixture
+    def parser(self):
+        """Create a minimal SimpleAgent-like object for parsing tests."""
+
+        class Parser:
+            def parse_actions(self, response_text: str) -> list[tuple[str, str]]:
+                actions = []
+                for line in response_text.split("\n"):
+                    if line.strip().startswith("ACTION:"):
+                        if len(actions) >= MAX_ACTIONS_PER_RESPONSE:
+                            break
+                        action_part = line.strip()[7:].strip()
+                        if ":" in action_part:
+                            tool_name, parameter = action_part.split(":", 1)
+                            tool_name = tool_name.strip()
+                            parameter = parameter.strip()
+                            if tool_name not in ALLOWED_TOOLS:
+                                continue
+                            if len(parameter) > MAX_PARAMETER_LENGTH:
+                                parameter = parameter[:MAX_PARAMETER_LENGTH]
+                            actions.append((tool_name, parameter))
+                return actions
+
+        return Parser()
+
+    def test_unknown_tool_name_rejected(self, parser):
+        response = "ACTION: exec_shell: rm -rf /"
+        actions = parser.parse_actions(response)
+        assert len(actions) == 0
+
+    def test_only_allowed_tools_accepted(self, parser):
+        response = """ACTION: calculate: 1 + 1
+ACTION: unknown: bad
+ACTION: save_note: hello"""
+        actions = parser.parse_actions(response)
+        assert len(actions) == 2
+        assert actions[0][0] == "calculate"
+        assert actions[1][0] == "save_note"
+
+    def test_max_actions_per_response_enforced(self, parser):
+        lines = [f"ACTION: calculate: {i}" for i in range(MAX_ACTIONS_PER_RESPONSE + 5)]
+        response = "\n".join(lines)
+        actions = parser.parse_actions(response)
+        assert len(actions) == MAX_ACTIONS_PER_RESPONSE
+
+    def test_long_parameter_truncated(self, parser):
+        long_param = "a" * (MAX_PARAMETER_LENGTH + 100)
+        response = f"ACTION: save_note: {long_param}"
+        actions = parser.parse_actions(response)
+        assert len(actions) == 1
+        assert len(actions[0][1]) == MAX_PARAMETER_LENGTH

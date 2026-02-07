@@ -5,6 +5,11 @@ Demonstrates the basic agent loop: Observe -> Think -> Act
 
 from .base import BaseAgent
 
+# --- Validation constants for action parsing ---
+MAX_ACTIONS_PER_RESPONSE = 10  # Maximum actions parsed from a single LLM response
+MAX_PARAMETER_LENGTH = 1000  # Maximum length of a single action parameter
+ALLOWED_TOOLS = {"calculate", "save_note", "search_memory"}
+
 
 class SimpleAgent(BaseAgent):
     """
@@ -40,9 +45,11 @@ use save_note. If they ask about something you saved, use search_memory."""
 
     def parse_actions(self, response_text: str) -> list[tuple[str, str]]:
         """
-        Extract actions from LLM response.
+        Extract actions from LLM response with validation.
 
         Looks for lines starting with "ACTION:" and extracts tool name and parameter.
+        Validates tool names against an allowlist and enforces limits on
+        the number of actions and parameter length.
 
         Args:
             response_text: The LLM's response
@@ -54,10 +61,24 @@ use save_note. If they ask about something you saved, use search_memory."""
 
         for line in response_text.split("\n"):
             if line.strip().startswith("ACTION:"):
+                if len(actions) >= MAX_ACTIONS_PER_RESPONSE:
+                    break
+
                 action_part = line.strip()[7:].strip()  # Remove 'ACTION:'
                 if ":" in action_part:
                     tool_name, parameter = action_part.split(":", 1)
-                    actions.append((tool_name.strip(), parameter.strip()))
+                    tool_name = tool_name.strip()
+                    parameter = parameter.strip()
+
+                    # Validate tool name against allowlist
+                    if tool_name not in ALLOWED_TOOLS:
+                        continue
+
+                    # Truncate overly long parameters
+                    if len(parameter) > MAX_PARAMETER_LENGTH:
+                        parameter = parameter[:MAX_PARAMETER_LENGTH]
+
+                    actions.append((tool_name, parameter))
 
         return actions
 
