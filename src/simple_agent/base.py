@@ -12,6 +12,9 @@ from .tools import ToolRegistry
 
 load_dotenv()
 
+# Maximum length of user input accepted by the interactive loop
+MAX_INPUT_LENGTH = 10000
+
 
 class BaseAgent(ABC):
     """
@@ -24,7 +27,9 @@ class BaseAgent(ABC):
     - Interactive run loop
     """
 
-    def __init__(self, model: str = "claude-sonnet-4-20250514", max_history_length: int = 50):
+    def __init__(
+        self, model: str = "claude-sonnet-4-20250514", max_history_length: int = 50
+    ):
         """
         Initialize the agent with Anthropic client.
 
@@ -73,7 +78,9 @@ class BaseAgent(ABC):
         self.conversation_history = self.conversation_history[excess:]
 
         # Ensure history starts with a user message for valid API structure
-        while self.conversation_history and self.conversation_history[0]["role"] != "user":
+        while (
+            self.conversation_history and self.conversation_history[0]["role"] != "user"
+        ):
             self.conversation_history.pop(0)
 
     @abstractmethod
@@ -106,6 +113,13 @@ class BaseAgent(ABC):
                     break
 
                 if not user_input:
+                    continue
+
+                if len(user_input) > MAX_INPUT_LENGTH:
+                    print(
+                        f"\nInput too long (max {MAX_INPUT_LENGTH} characters). "
+                        "Please shorten your message."
+                    )
                     continue
 
                 response, action_results = self.run_step(user_input)

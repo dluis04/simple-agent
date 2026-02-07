@@ -11,6 +11,10 @@ Benefits over manual parsing:
 from .base import BaseAgent
 from .tools import TOOL_SCHEMAS
 
+# Maximum number of consecutive tool-use loop iterations before stopping
+MAX_TOOL_LOOP_ITERATIONS = 20
+ALLOWED_TOOLS = {"calculate", "save_note", "search_memory"}
+
 
 class AdvancedAgent(BaseAgent):
     """
@@ -26,6 +30,9 @@ class AdvancedAgent(BaseAgent):
         """
         Execute a tool by name with structured input.
 
+        Validates tool name against an allowlist and checks that
+        required input parameters are present and are strings.
+
         Args:
             tool_name: Name of the tool
             tool_input: Dict of input parameters
@@ -33,12 +40,27 @@ class AdvancedAgent(BaseAgent):
         Returns:
             Tool result as dict
         """
+        if tool_name not in ALLOWED_TOOLS:
+            return {"error": f"Unknown tool: {tool_name}"}
+
+        if not isinstance(tool_input, dict):
+            return {"error": "Tool input must be a dictionary"}
+
         if tool_name == "calculate":
-            return self.tool_registry.calculate(tool_input["expression"])
+            expression = tool_input.get("expression")
+            if not isinstance(expression, str):
+                return {"error": "Missing or invalid 'expression' parameter"}
+            return self.tool_registry.calculate(expression)
         elif tool_name == "save_note":
-            return self.tool_registry.save_note(tool_input["note"])
+            note = tool_input.get("note")
+            if not isinstance(note, str):
+                return {"error": "Missing or invalid 'note' parameter"}
+            return self.tool_registry.save_note(note)
         elif tool_name == "search_memory":
-            return self.tool_registry.search_memory(tool_input["query"])
+            query = tool_input.get("query")
+            if not isinstance(query, str):
+                return {"error": "Missing or invalid 'query' parameter"}
+            return self.tool_registry.search_memory(query)
 
         return {"error": f"Unknown tool: {tool_name}"}
 
@@ -62,9 +84,17 @@ class AdvancedAgent(BaseAgent):
         self.conversation_history.append({"role": "user", "content": user_input})
 
         tool_results = []
+        iterations = 0
 
         # Agent loop: continue until we get a text response
         while True:
+            iterations += 1
+            if iterations > MAX_TOOL_LOOP_ITERATIONS:
+                self._trim_history()
+                return (
+                    "Stopped: too many consecutive tool calls.",
+                    tool_results,
+                )
             print("[Think] Querying LLM with tool definitions...")
 
             response = self.client.messages.create(

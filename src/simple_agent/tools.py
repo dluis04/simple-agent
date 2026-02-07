@@ -6,6 +6,12 @@ import ast
 import operator
 from typing import Union
 
+# --- Input validation constants ---
+MAX_NOTE_LENGTH = 1000  # Maximum characters per note
+MAX_MEMORY_NOTES = 100  # Maximum number of notes stored
+MAX_QUERY_LENGTH = 200  # Maximum search query length
+MAX_EXPRESSION_LENGTH = 200  # Maximum math expression length
+
 
 class SafeExpressionEvaluator:
     """
@@ -76,7 +82,9 @@ class SafeExpressionEvaluator:
             operand = self._eval_node(node.operand)
             op_func = self.OPERATORS.get(type(node.op))
             if op_func is None:
-                raise ValueError(f"Unsupported unary operator: {type(node.op).__name__}")
+                raise ValueError(
+                    f"Unsupported unary operator: {type(node.op).__name__}"
+                )
             return op_func(operand)
 
         elif isinstance(node, ast.Expression):
@@ -103,6 +111,12 @@ class ToolRegistry:
         Returns:
             Dict with result or error
         """
+        if not isinstance(expression, str):
+            return {"error": "Expression must be a string"}
+        if len(expression) > MAX_EXPRESSION_LENGTH:
+            return {
+                "error": f"Expression too long (max {MAX_EXPRESSION_LENGTH} characters)"
+            }
         try:
             result = self._evaluator.evaluate(expression)
             return {"result": result}
@@ -121,8 +135,16 @@ class ToolRegistry:
             note: The note to save
 
         Returns:
-            Dict with status and message
+            Dict with status and message, or error dict on validation failure
         """
+        if not isinstance(note, str):
+            return {"error": "Note must be a string"}
+        if not note.strip():
+            return {"error": "Note cannot be empty"}
+        if len(note) > MAX_NOTE_LENGTH:
+            return {"error": f"Note too long (max {MAX_NOTE_LENGTH} characters)"}
+        if len(self.memory) >= MAX_MEMORY_NOTES:
+            return {"error": f"Memory full (max {MAX_MEMORY_NOTES} notes)"}
         self.memory.append(note)
         return {"status": "success", "message": f"Saved: {note}"}
 
@@ -134,8 +156,14 @@ class ToolRegistry:
             query: Keyword to search for
 
         Returns:
-            Dict with results and count
+            Dict with results and count, or error dict on validation failure
         """
+        if not isinstance(query, str):
+            return {"error": "Query must be a string"}
+        if not query.strip():
+            return {"error": "Query cannot be empty"}
+        if len(query) > MAX_QUERY_LENGTH:
+            return {"error": f"Query too long (max {MAX_QUERY_LENGTH} characters)"}
         results = [note for note in self.memory if query.lower() in note.lower()]
         return {"results": results, "count": len(results)}
 

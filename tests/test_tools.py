@@ -2,7 +2,14 @@
 
 import pytest
 
-from simple_agent.tools import ToolRegistry, TOOL_SCHEMAS
+from simple_agent.tools import (
+    ToolRegistry,
+    TOOL_SCHEMAS,
+    MAX_NOTE_LENGTH,
+    MAX_MEMORY_NOTES,
+    MAX_QUERY_LENGTH,
+    MAX_EXPRESSION_LENGTH,
+)
 
 
 class TestToolRegistry:
@@ -87,6 +94,73 @@ class TestToolRegistry:
         registry.save_note("JavaScript basics")
         result = registry.search_memory("python")
         assert result["count"] == 2
+
+    # --- Input validation tests ---
+
+    def test_calculate_expression_too_long(self, registry):
+        long_expr = "1 + " * (MAX_EXPRESSION_LENGTH // 4 + 1)
+        result = registry.calculate(long_expr)
+        assert "error" in result
+        assert "too long" in result["error"]
+
+    def test_calculate_non_string_expression(self, registry):
+        result = registry.calculate(123)
+        assert "error" in result
+        assert "must be a string" in result["error"]
+
+    def test_save_note_empty(self, registry):
+        result = registry.save_note("")
+        assert "error" in result
+        assert "empty" in result["error"]
+
+    def test_save_note_whitespace_only(self, registry):
+        result = registry.save_note("   ")
+        assert "error" in result
+        assert "empty" in result["error"]
+
+    def test_save_note_too_long(self, registry):
+        long_note = "a" * (MAX_NOTE_LENGTH + 1)
+        result = registry.save_note(long_note)
+        assert "error" in result
+        assert "too long" in result["error"]
+
+    def test_save_note_non_string(self, registry):
+        result = registry.save_note(42)
+        assert "error" in result
+        assert "must be a string" in result["error"]
+
+    def test_save_note_memory_full(self, registry):
+        for i in range(MAX_MEMORY_NOTES):
+            registry.save_note(f"Note {i}")
+        result = registry.save_note("One more note")
+        assert "error" in result
+        assert "full" in result["error"]
+
+    def test_save_note_at_max_length_succeeds(self, registry):
+        note = "a" * MAX_NOTE_LENGTH
+        result = registry.save_note(note)
+        assert result["status"] == "success"
+
+    def test_search_memory_empty_query(self, registry):
+        result = registry.search_memory("")
+        assert "error" in result
+        assert "empty" in result["error"]
+
+    def test_search_memory_whitespace_only_query(self, registry):
+        result = registry.search_memory("   ")
+        assert "error" in result
+        assert "empty" in result["error"]
+
+    def test_search_memory_query_too_long(self, registry):
+        long_query = "a" * (MAX_QUERY_LENGTH + 1)
+        result = registry.search_memory(long_query)
+        assert "error" in result
+        assert "too long" in result["error"]
+
+    def test_search_memory_non_string_query(self, registry):
+        result = registry.search_memory(99)
+        assert "error" in result
+        assert "must be a string" in result["error"]
 
 
 class TestToolSchemas:
